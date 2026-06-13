@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>F1 Live Dashboard</title>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --bg: #0f0f0f;
+            --surface: #1a1a1a;
+            --surface2: #222;
+            --border: #2e2e2e;
+            --text: #e8e8e8;
+            --muted: #888;
+            --green: #4ade80;
+            --green-dim: #1a3320;
+            --red: #e10600;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 18px 28px;
+            border-bottom: 1px solid var(--border);
+            background: var(--surface);
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .logo-bar {
+            width: 4px;
+            height: 28px;
+            background: var(--green);
+            border-radius: 2px;
+        }
+
+        .logo h1 {
+            font-size: 16px;
+            font-weight: 700;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            color: var(--text);
+        }
+
+        .logo span {
+            font-size: 11px;
+            color: var(--muted);
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        .live-pill {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            padding: 5px 12px;
+            border-radius: 20px;
+            background: var(--green-dim);
+            border: 1px solid #2d5535;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            color: var(--green);
+        }
+
+        .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #f87171;
+        }
+
+        .dot.active { animation: pulse 1.2s ease-in-out infinite; }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.4; transform: scale(0.85); }
+        }
+
+        .back-btn {
+            background: var(--surface2);
+            color: var(--muted);
+            border: 1px solid var(--border);
+            padding: 7px 14px;
+            border-radius: 6px;
+            font-size: 12px;
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+
+        .back-btn:hover { color: var(--text); }
+
+        .controls {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 14px 28px;
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .toggle-btn {
+            padding: 8px 20px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            transition: background 0.2s;
+            letter-spacing: 0.5px;
+        }
+
+        .toggle-btn.start {
+            background: var(--green);
+            color: #000;
+        }
+
+        .toggle-btn.start:hover { background: #22c55e; }
+
+        .toggle-btn.stop {
+            background: #2e1a1a;
+            color: #f87171;
+            border: 1px solid #3a2020;
+        }
+
+        .toggle-btn.stop:hover { background: #3a2020; }
+
+        #status {
+            font-size: 12px;
+            color: var(--muted);
+            font-style: italic;
+            margin-left: auto;
+        }
+
+        .main {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            padding: 24px 28px;
+        }
+
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 20px;
+            overflow: hidden;
+        }
+
+        .card-title {
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: var(--muted);
+            margin-bottom: 14px;
+        }
+
+        .full { grid-column: span 2; }
+
+        /* Stream */
+        #stream {
+            font-family: 'Cascadia Code', 'Consolas', monospace;
+            font-size: 11.5px;
+            background: #0a0a0a;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 12px;
+            height: 200px;
+            overflow-y: auto;
+            color: var(--green);
+            display: flex;
+            flex-direction: column-reverse;
+        }
+
+        .stream-line {
+            padding: 2px 0;
+            border-bottom: 1px solid #111;
+            word-break: break-all;
+        }
+
+        .stream-line .ts {
+            color: #555;
+            margin-right: 8px;
+            user-select: none;
+        }
+
+        /* Info panel */
+        .info-note {
+            background: #1a1500;
+            border: 1px solid #3a2e00;
+            border-radius: 6px;
+            padding: 14px 16px;
+            font-size: 13px;
+            color: #a0844a;
+            margin-bottom: 16px;
+            line-height: 1.6;
+        }
+
+        .info-note strong {
+            color: #fbbf24;
+            font-weight: 600;
+        }
+
+        .requirements {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .req-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            font-size: 13px;
+            color: var(--muted);
+        }
+
+        .req-icon {
+            font-size: 15px;
+            margin-top: 1px;
+            flex-shrink: 0;
+        }
+
+        .req-item a {
+            color: #60a5fa;
+            text-decoration: none;
+        }
+
+        .req-item a:hover { text-decoration: underline; }
+
+        /* Stats row */
+        .stats-row {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .stat {
+            background: var(--surface2);
+            border-radius: 8px;
+            padding: 12px 14px;
+            text-align: center;
+        }
+
+        .stat-val {
+            font-size: 22px;
+            font-weight: 700;
+            color: var(--green);
+        }
+
+        .stat-label {
+            font-size: 10px;
+            color: var(--muted);
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            margin-top: 3px;
+        }
+
+        @media (max-width: 768px) {
+            .main { grid-template-columns: 1fr; }
+            .full { grid-column: span 1; }
+            header { flex-wrap: wrap; gap: 12px; }
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <div class="logo">
+        <div class="logo-bar"></div>
+        <div>
+            <h1>F1 Live</h1>
+            <span>Real-time Timing</span>
+        </div>
+    </div>
+    <div style="display:flex; align-items:center; gap:12px;">
+        <div class="live-pill">
+            <div class="dot" id="live-dot"></div>
+            <span id="live-label">Offline</span>
+        </div>
+        <a href="/" class="back-btn">← Historical</a>
+    </div>
+</header>
+
+<div class="controls">
+    <button class="toggle-btn start" id="toggle-btn" onclick="toggleLive()">Start Live Feed</button>
+    <div id="status">Not connected</div>
+</div>
+
+<div class="main">
+
+    <!-- Stats -->
+    <div class="card full">
+        <div class="stats-row">
+            <div class="stat">
+                <div class="stat-val" id="msg-count">0</div>
+                <div class="stat-label">Messages received</div>
+            </div>
+            <div class="stat">
+                <div class="stat-val" id="uptime">0s</div>
+                <div class="stat-label">Connected for</div>
+            </div>
+            <div class="stat">
+                <div class="stat-val" id="last-type">—</div>
+                <div class="stat-label">Last data type</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stream log -->
+    <div class="card">
+        <div class="card-title">Data Stream</div>
+        <div id="stream">
+            <div class="stream-line"><span class="ts">--:--:--</span>Waiting for feed...</div>
+        </div>
+    </div>
+
+    <!-- Info / timing -->
+    <div class="card">
+        <div class="card-title">About Live Timing</div>
+        <div class="info-note">
+            <strong>Note:</strong> F1 live timing requires an active race weekend broadcast. Outside of sessions, the feed will connect but receive no meaningful data.
+        </div>
+        <div class="requirements">
+            <div class="req-item">
+                <span class="req-icon">📡</span>
+                <span>Live data comes from the <strong>F1 SignalR</strong> stream via the <code>fastf1.livetiming</code> module</span>
+            </div>
+            <div class="req-item">
+                <span class="req-icon">🏎</span>
+                <span>Only works during an active FP, Qualifying, or Race session — not between events</span>
+            </div>
+            <div class="req-item">
+                <span class="req-icon">🔑</span>
+                <span>No F1 account needed — the public feed is used. See the <a href="https://docs.fastf1.dev/livetiming.html" target="_blank">fastf1 docs</a> for full setup</span>
+            </div>
+            <div class="req-item">
+                <span class="req-icon">⚡</span>
+                <span>The backend emits data via WebSocket every 2 seconds during an active stream</span>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<script>
+const socket = io();
+let isLive = false;
+let msgCount = 0;
+let startTime = null;
+let uptimeInterval = null;
+
+socket.on('status', d => {
+    document.getElementById('status').textContent = d.msg;
+});
+
+socket.on('live_error', d => {
+    document.getElementById('status').textContent = '⚠ ' + d.msg;
+    appendStream('ERROR: ' + d.msg, 'error');
+});
+
+socket.on('live_data', d => {
+    msgCount++;
+    document.getElementById('msg-count').textContent = msgCount;
+    document.getElementById('last-type').textContent = d.type || '?';
+
+    const preview = JSON.stringify(d).substring(0, 90) + (JSON.stringify(d).length > 90 ? '…' : '');
+    appendStream(preview);
+});
+
+function appendStream(text, type) {
+    const stream = document.getElementById('stream');
+    const now = new Date().toLocaleTimeString('en-GB', { hour12: false });
+    const line = document.createElement('div');
+    line.className = 'stream-line';
+    line.innerHTML = `<span class="ts">${now}</span>${escHtml(text)}`;
+    stream.prepend(line);
+    while (stream.children.length > 80) stream.removeChild(stream.lastChild);
+}
+
+function escHtml(s) {
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function toggleLive() {
+    const btn = document.getElementById('toggle-btn');
+    if (!isLive) {
+        isLive = true;
+        msgCount = 0;
+        startTime = Date.now();
+        socket.emit('start_live');
+        btn.textContent = 'Stop Live Feed';
+        btn.className = 'toggle-btn stop';
+        document.getElementById('live-dot').classList.add('active');
+        document.getElementById('live-label').textContent = 'Live';
+        uptimeInterval = setInterval(() => {
+            const s = Math.floor((Date.now() - startTime) / 1000);
+            const m = Math.floor(s / 60);
+            document.getElementById('uptime').textContent = m > 0 ? `${m}m ${s % 60}s` : `${s}s`;
+        }, 1000);
+        appendStream('Feed started. Connecting to F1 timing servers...');
+    } else {
+        isLive = false;
+        socket.emit('stop_live');
+        btn.textContent = 'Start Live Feed';
+        btn.className = 'toggle-btn start';
+        document.getElementById('live-dot').classList.remove('active');
+        document.getElementById('live-label').textContent = 'Offline';
+        clearInterval(uptimeInterval);
+        appendStream('Feed stopped.');
+    }
+}
+</script>
+</body>
+</html>
