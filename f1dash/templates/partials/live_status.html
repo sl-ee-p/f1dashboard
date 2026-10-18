@@ -1,0 +1,9 @@
+{% set ts = state.track_status %}
+<div class="status-bar">
+  <div><div class="muted" style="font-size:.8rem">{{ title }}{% if final %} · replay finished{% endif %}</div>
+    <div class="lap num">Lap {{ state.leader_lap or '–' }}{% if state.total_laps %}<span class="muted"> / {{ state.total_laps }}</span>{% endif %}</div></div>
+  <span class="track-status {{ {'Safety car': 'sc', 'VSC': 'vsc', 'Red flag': 'red', 'Chequered': 'chequered'}.get(ts, '') }}">{{ ts }}</span>
+  {% if state.clock is not none %}<span class="secondary">Session clock <b class="num"><time data-localtime="{{ state.clock.isoformat() }}" data-format="time">{{ state.clock.strftime('%H:%M:%S') }} UTC</time></b></span>{% endif %}
+  <span class="secondary">Replay speed <b>{{ speed }}×</b></span>
+  {% if state.fastest %}<span class="secondary">Fastest lap <b class="num">{{ state.cars[state.fastest[1]].code }} {{ '%d:%06.3f'|format(state.fastest[0] // 60, state.fastest[0] % 60) }}</b></span>{% endif %}
+</div>

@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Live timing · F1 Dash{% endblock %}
+{% block head_scripts %}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><div class="eyebrow">Live timing</div><h1>Timing tower</h1></div>
+</div>
+
+<p class="notice">
+  F1's live feed and OpenF1's real-time tier both need paid access now, so this page <b>replays</b> a finished race through the same live-timing engine, at the speed you pick.
+  {% if next_event %}Next session: <b>{{ next_event.race }} {{ next_event.session }}</b>, <span data-countdown="{{ next_event.when|isotime }}">…</span>.{% endif %}
+</p>
+
+{% if not enabled %}
+<section class="card" style="margin-top:1rem"><p>Live timing is turned off on this server (<code>F1DASH_LIVE_ENABLED=0</code>).</p></section>
+{% elif not sessions %}
+<section class="card" style="margin-top:1rem"><p>No finished races are available to replay yet.</p></section>
+{% else %}
+<form class="filters live-controls" method="get" action="{{ url_for('live.page') }}" style="margin-top:1rem">
+  <label>Race
+    <select name="session">
+      {% for sx in sessions %}{% set mt = meetings[sx.meeting_key] %}
+      <option value="{{ sx.session_key }}" {% if sx.session_key == key %}selected{% endif %}>{{ sx.year }} {{ mt.meeting_name or sx.location }}{% if sx.session_name != 'Race' %} ({{ sx.session_name }}){% endif %}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label>Speed
+    <select name="speed">{% for sp in speeds %}<option value="{{ sp }}" {% if sp == speed %}selected{% endif %}>{{ sp }}×</option>{% endfor %}</select>
+  </label>
+  <label>Start from lap
+    <select name="lap">{% for l in range(1, 80) %}<option value="{{ l }}" {% if l == lap %}selected{% endif %}>{{ l }}</option>{% endfor %}</select>
+  </label>
+  <button class="btn" type="submit">Start replay</button>
+</form>
+
+<div class="grid" hx-ext="sse" sse-connect="{{ url_for('live.stream', session=key, speed=speed, lap=lap) }}" sse-close="end">
+  <section class="card span-12" aria-live="polite">
+    <div sse-swap="status">{% with label='Connecting…', short=True %}{% include "partials/skeleton.html" %}{% endwith %}</div>
+  </section>
+  <section class="card span-8" aria-labelledby="h-tower">
+    <header><h2 id="h-tower">Classification</h2><p>Updates every second</p></header>
+    <div sse-swap="tower">{% include "partials/skeleton.html" %}</div>
+  </section>
+  <section class="card span-4" aria-labelledby="h-rc">
+    <header><h2 id="h-rc">Race control</h2></header>
+    <div sse-swap="rc"><p class="muted">Waiting for messages…</p></div>
+  </section>
+</div>
+{% endif %}
+{% endblock %}

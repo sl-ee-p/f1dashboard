@@ -1,0 +1,33 @@
+<div class="table-wrap">
+<table>
+  <thead><tr>
+    <th class="num">Pos</th><th>Driver</th><th class="hide-sm">Team</th>
+    {% if is_race %}<th class="num">Grid</th><th class="num">+/−</th><th class="num">Laps</th><th class="num">Time / gap</th><th class="num">Stops</th><th class="num">Best lap</th><th class="num">Pts</th>
+    {% elif is_quali %}<th class="num">Q1</th><th class="num">Q2</th><th class="num">Q3</th><th class="num">Laps</th>
+    {% else %}<th class="num">Best lap</th><th class="num">Gap</th><th class="num">Laps</th>{% endif %}
+  </tr></thead>
+  <tbody>
+  {% for r in rows %}
+  <tr>
+    <td class="num pos">{{ r.position or r.status }}</td>
+    <td class="driver-cell"><span class="team-swatch" style="background:{{ r.colour }}" aria-hidden="true"></span><b>{{ r.code }}</b><span class="hide-sm secondary">{{ r.name }}</span></td>
+    <td class="hide-sm secondary">{{ r.team }}</td>
+    {% if is_race %}
+    <td class="num">{{ r.grid if r.grid else '' }}</td>
+    <td class="num">{% if r.delta %}<span class="{{ 'up' if r.delta > 0 else 'down' }}">{{ r.delta|abs }}</span>{% elif r.delta == 0 %}<span class="muted">–</span>{% endif %}</td>
+    <td class="num">{{ r.laps if r.laps is not none }}</td>
+    <td class="num">{{ r.time }}</td>
+    <td class="num">{{ r.pits }}</td>
+    <td class="num">{% if r.best_lap_is_fastest %}<span class="badge fastest">{{ r.best_lap }}</span>{% else %}{{ r.best_lap }}{% endif %}</td>
+    <td class="num">{{ r.points|points }}</td>
+    {% elif is_quali %}
+    {% for q in r.q %}<td class="num">{{ q }}</td>{% endfor %}
+    <td class="num">{{ r.laps if r.laps is not none }}</td>
+    {% else %}
+    <td class="num">{{ r.time }}</td><td class="num">{{ r.gap }}</td><td class="num">{{ r.laps if r.laps is not none }}</td>
+    {% endif %}
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>

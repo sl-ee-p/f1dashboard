@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% set m = s.meeting %}
+{% block title %}{{ m.meeting_name }} {{ s.year }} · {{ s.session_name }} · F1 Dash{% endblock %}
+{% macro panel(name, title, sub='', span='span-12', short=False) -%}
+<section class="card panel-card {{ span }}" aria-labelledby="h-{{ name }}">
+  <header><h2 id="h-{{ name }}">{{ title }}</h2>{% if sub %}<p>{{ sub }}</p>{% endif %}</header>
+  <div class="panel" {% if name in ('positions', 'gaps', 'laptimes') %}data-focus-aware{% endif %} hx-get="{{ url_for('pages.panel', session_key=s.session_key, name=name, focus=focus_arg) }}" hx-trigger="load" hx-swap="innerHTML">
+    {% with short=short %}{% include "partials/skeleton.html" %}{% endwith %}
+  </div>
+</section>
+{%- endmacro %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <div class="eyebrow">{{ s.year }} · {{ m.circuit_short_name or s.circuit_short_name }} · <time data-localtime="{{ s.date_start }}" data-format="date">{{ s.date_start[:10] }}</time></div>
+    <h1>{{ m.meeting_name or s.location }} <span class="secondary">· {{ s.session_name }}</span></h1>
+  </div>
+  <nav class="tabs" aria-label="Sessions this weekend">
+    {% for sib in siblings %}
+    <a href="{{ url_for('pages.session', session_key=sib.key) }}" {% if sib.key == s.session_key %}aria-current="page"{% endif %}>{{ sib.name }}</a>
+    {% endfor %}
+    <a href="{{ url_for('pages.season', year=s.year) }}">Season {{ s.year }}</a>
+  </nav>
+</div>
+
+{% if weather %}
+<p class="stats" aria-label="Weather">
+  <span>Air <b class="num">{{ '%.0f'|format(weather.air[0]) }}–{{ '%.0f'|format(weather.air[1]) }} °C</b></span>
+  <span>Track <b class="num">{{ '%.0f'|format(weather.track[0]) }}–{{ '%.0f'|format(weather.track[1]) }} °C</b></span>
+  <span>Humidity <b class="num">{{ weather.humidity }}%</b></span>
+  <span>Wind <b class="num">{{ weather.wind }} m/s</b></span>
+  <span>{{ 'Rain during session' if weather.rain else 'Dry' }}</span>
+</p>
+{% endif %}
+
+<form class="filters" method="get" action="{{ url_for('pages.session', session_key=s.session_key) }}" data-focus-form data-initial="{{ focus_arg }}">
+  <span class="label" id="focus-label">Highlight up to 3 drivers</span>
+  {% for n in order %}{% set d = drivers[n] %}{% set slot = focus.index(n) + 1 if n in focus else 0 %}
+  <label class="chip" title="{{ d.name }} · {{ d.team }}">
+    <input type="checkbox" name="focus" value="{{ n }}" {% if slot %}checked{% endif %} aria-describedby="focus-label">
+    <span><i class="key {% if slot %}s{{ slot }}{% endif %}"></i>{{ d.code }}</span>
+  </label>
+  {% endfor %}
+  <noscript><button class="btn" type="submit">Apply</button></noscript>
+</form>
+
+<div class="grid">
+  {{ panel('results', 'Classification' if is_race else 'Results', 'Gap at the line; fastest lap marked ◆' if is_race else ('Q1 / Q2 / Q3 times' if is_quali else 'Best lap per driver'), 'span-12', True) }}
+  {% if is_race %}
+  {{ panel('positions', 'Position by lap', 'Shaded laps: safety car, VSC or red flag', 'span-6') }}
+  {{ panel('gaps', 'Gap to leader', 'Seconds behind the leader as each lap is completed', 'span-6') }}
+  {% endif %}
+  {{ panel('stints', 'Tyre strategy', 'Stints by compound; letters mark the tyre', 'span-6') }}
+  {{ panel('laptimes', 'Lap time distribution', 'Quick laps only: no lap 1, no out-laps, within 107% of the best', 'span-6') }}
+
+  <section class="card span-12" aria-labelledby="h-telemetry">
+    <header><h2 id="h-telemetry">Telemetry compare</h2><p>Two laps, aligned by distance. Defaults to each driver's fastest lap.</p></header>
+    <div class="panel" id="telemetry-panel" data-focus-aware hx-get="{{ url_for('pages.telemetry', session_key=s.session_key, focus=focus_arg) }}" hx-trigger="load" hx-swap="innerHTML">
+      {% with label='Loading car data…' %}{% include "partials/skeleton.html" %}{% endwith %}
+    </div>
+  </section>
+
+  {{ panel('racecontrol', 'Race control', 'Flags and messages from the stewards', 'span-6') }}
+  {{ panel('weather', 'Weather', 'Air and track temperature over the session', 'span-6') }}
+</div>
+{% endblock %}

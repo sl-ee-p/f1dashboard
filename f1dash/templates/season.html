@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}{{ year }} season · F1 Dash{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><div class="eyebrow">Season overview</div><h1>{{ year }} Formula 1 season</h1></div>
+  <form method="get" action="{{ url_for('pages.season_index') }}" data-year-form>
+    <label class="visually-hidden" for="year">Season</label>
+    <select id="year" name="year" data-year-select>
+      {% for y in years %}<option value="{{ y }}" {% if y == year %}selected{% endif %}>{{ y }}</option>{% endfor %}
+    </select>
+  </form>
+</div>
+
+<div class="grid">
+  <section class="card span-12" aria-labelledby="h-cal">
+    <header><h2 id="h-cal">Calendar</h2>
+      <p>{% if has_sessions %}Pick a session to open its analysis.{% else %}Session analysis is available from {{ first_session_year }} (OpenF1 coverage).{% endif %}</p></header>
+    <div class="table-wrap">
+    <table class="calendar">
+      <thead><tr><th class="num">Rd</th><th>Grand Prix</th><th class="hide-sm">Circuit</th><th>Date</th><th>Winner</th>{% if has_sessions %}<th>Sessions</th>{% endif %}</tr></thead>
+      <tbody>
+      {% set ns = namespace(next_marked=false) %}
+      {% for r in calendar %}
+      {% set is_next = not r.done and not ns.next_marked %}{% if is_next %}{% set ns.next_marked = true %}{% endif %}
+      <tr class="{{ 'upcoming' if not r.done }}{{ ' next' if is_next }}">
+        <td class="num">{{ r.round }}</td>
+        <td><b>{{ r.name }}</b>{% if r.sprint %} <span class="badge">Sprint</span>{% endif %}</td>
+        <td class="hide-sm secondary">{{ r.circuit }}</td>
+        <td class="num">{{ r.date.strftime('%d %b') }}</td>
+        <td>{% if r.winner %}<b>{{ r.winner.code }}</b> <span class="secondary hide-sm">{{ r.winner.team }}</span>{% elif is_next %}<span class="muted">Next</span>{% endif %}</td>
+        {% if has_sessions %}<td><nav class="tabs">{% for sx in r.sessions %}<a href="{{ url_for('pages.session', session_key=sx.key) }}">{{ sx.name|replace('Practice ', 'FP')|replace('Sprint Qualifying', 'SQ')|replace('Sprint Shootout', 'SS')|replace('Qualifying', 'Quali') }}</a>{% endfor %}</nav></td>{% endif %}
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    </div>
+  </section>
+
+  {% if drivers %}
+  <section class="card span-6" aria-labelledby="h-dp">
+    <header><h2 id="h-dp">Drivers' points by round</h2><p>Top three highlighted</p></header>
+    <div class="panel" hx-get="{{ url_for('pages.season_progression', year=year, what='drivers') }}" hx-trigger="load">{% include "partials/skeleton.html" %}</div>
+  </section>
+  <section class="card span-6" aria-labelledby="h-tp">
+    <header><h2 id="h-tp">Constructors' points by round</h2><p>Top three highlighted</p></header>
+    <div class="panel" hx-get="{{ url_for('pages.season_progression', year=year, what='teams') }}" hx-trigger="load">{% include "partials/skeleton.html" %}</div>
+  </section>
+  <section class="card span-6" aria-labelledby="h-wdc">
+    <header><h2 id="h-wdc">Drivers' standings</h2></header>
+    {% with rows=drivers, kind='drivers' %}{% include "partials/standings.html" %}{% endwith %}
+  </section>
+  <section class="card span-6" aria-labelledby="h-wcc">
+    <header><h2 id="h-wcc">Constructors' standings</h2></header>
+    {% with rows=teams, kind='teams' %}{% include "partials/standings.html" %}{% endwith %}
+  </section>
+  {% endif %}
+</div>
+{% endblock %}

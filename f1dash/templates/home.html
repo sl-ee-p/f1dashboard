@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="grid">
+  <section class="card span-7 hero" aria-labelledby="h-next">
+    {% if next %}
+    <p class="muted" id="h-next">Next up · Round {{ next.round }}, {{ next.year }}</p>
+    <h1>{{ next.race }} <span class="secondary">· {{ next.session }}</span></h1>
+    <div class="countdown" data-countdown="{{ next.when|isotime }}">…</div>
+    <p class="secondary"><time data-localtime="{{ next.when|isotime }}">{{ next.when.strftime('%d %b %Y %H:%M UTC') }}</time> · {{ next.circuit }}</p>
+    {% else %}
+    <h1 id="h-next">No upcoming sessions published</h1>
+    {% endif %}
+    <p><a href="{{ url_for('live.page') }}">Replay the last race on the live timing tower →</a></p>
+  </section>
+
+  <section class="card span-5" aria-labelledby="h-podium">
+    {% if latest %}
+    <header><h2 id="h-podium">Last race · {{ latest_meeting.meeting_name if latest_meeting else latest.location }}</h2>
+      <p><time data-localtime="{{ latest.date_start }}" data-format="date">{{ latest.date_start[:10] }}</time></p></header>
+    <div class="podium">
+      {% for r in podium %}
+      <a class="step" href="{{ url_for('pages.session', session_key=latest.session_key) }}" style="text-decoration:none">
+        <div class="p">P{{ r.position }}</div>
+        <div><span class="team-swatch" style="background:{{ r.colour }}" aria-hidden="true"></span><span class="code">{{ r.code }}</span></div>
+        <div class="team">{{ r.team }}</div>
+        <div class="num secondary" style="font-size:.8rem">{{ r.time }}</div>
+      </a>
+      {% endfor %}
+    </div>
+    <nav class="tabs" style="margin-top:.8rem" aria-label="Sessions of the last weekend">
+      {% for sib in latest_sessions %}<a href="{{ url_for('pages.session', session_key=sib.key) }}">{{ sib.name }}</a>{% endfor %}
+    </nav>
+    {% else %}
+    <h2 id="h-podium">No recent race data</h2>
+    {% endif %}
+  </section>
+
+  <section class="card span-6" aria-labelledby="h-wdc">
+    <header><h2 id="h-wdc">Drivers' championship {{ standings_year }}</h2><p><a href="{{ url_for('pages.season', year=standings_year) }}">Full standings</a></p></header>
+    {% with rows=drivers, kind='drivers' %}{% include "partials/standings.html" %}{% endwith %}
+  </section>
+  <section class="card span-6" aria-labelledby="h-wcc">
+    <header><h2 id="h-wcc">Constructors' championship {{ standings_year }}</h2><p><a href="{{ url_for('pages.season', year=standings_year) }}">Full standings</a></p></header>
+    {% with rows=teams, kind='teams' %}{% include "partials/standings.html" %}{% endwith %}
+  </section>
+</div>
+{% endblock %}

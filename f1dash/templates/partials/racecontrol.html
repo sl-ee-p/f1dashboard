@@ -1,0 +1,8 @@
+{% if messages %}
+<ul class="rc-list">
+  {% for m in messages %}
+  <li><span class="when">{% if m.lap %}L{{ m.lap }}{% else %}{{ m.minute }}′{% endif %}</span>
+      <span>{% if m.flag %}<i class="flag {{ m.flag|replace(' ', '-') }}" aria-hidden="true"></i><span class="visually-hidden">{{ m.flag }} flag: </span>{% endif %}{{ m.message }}</span></li>
+  {% endfor %}
+</ul>
+{% else %}{% include "partials/empty.html" %}{% endif %}

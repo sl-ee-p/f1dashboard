@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}F1 Dash{% endblock %}</title>
+  <meta name="description" content="Formula 1 session analysis, season overview and live timing replay.">
+  <script>
+    // Apply the saved theme before first paint.
+    (function () {
+      var t = localStorage.getItem("theme");
+      if (t === "light" || t === "dark") document.documentElement.dataset.theme = t;
+    })();
+  </script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><path d='M6 22 14 10h14l-8 12z' fill='%23ff1e3c'/></svg>">
+  <script src="{{ url_for('static', filename='vendor/htmx.min.js') }}" defer></script>
+  <script src="{{ url_for('static', filename='vendor/htmx-ext-sse.js') }}" defer></script>
+  {% block head_scripts %}
+  <script src="{{ url_for('static', filename='vendor/plotly-cartesian.min.js') }}" defer></script>
+  <script src="{{ url_for('static', filename='js/charts.js') }}" defer></script>
+  {% endblock %}
+  <script src="{{ url_for('static', filename='js/app.js') }}" defer></script>
+</head>
+<body hx-boost="true">
+  <header class="topbar">
+    <a class="brand" href="{{ url_for('pages.home') }}"><span class="brand-mark" aria-hidden="true"></span>F1&nbsp;Dash</a>
+    <nav class="nav" aria-label="Main">
+      {% set ep = request.endpoint or '' %}
+      <a href="{{ url_for('pages.home') }}" {% if ep == 'pages.home' %}aria-current="page"{% endif %}>Home</a>
+      <a href="{{ url_for('pages.season_index') }}" {% if ep.startswith('pages.season') or ep.startswith('pages.session') %}aria-current="page"{% endif %}>Seasons</a>
+      <a href="{{ url_for('live.page') }}" {% if ep.startswith('live.') %}aria-current="page"{% endif %}>Live</a>
+    </nav>
+    <button class="icon-btn" type="button" id="theme-toggle" aria-label="Switch light or dark theme" title="Switch light or dark theme"><span aria-hidden="true">◐</span><span class="hide-sm"> Theme</span></button>
+  </header>
+  <main id="main">
+    {% block content %}{% endblock %}
+  </main>
+  <footer>
+    Data: <a href="https://openf1.org">OpenF1</a> · <a href="https://github.com/jolpica/jolpica-f1">Jolpica</a> · <a href="https://multiviewer.app">MultiViewer</a>.
+    Unofficial and not associated with Formula 1.
+    <a href="{{ url_for('api.index') }}">API</a>
+  </footer>
+</body>
+</html>

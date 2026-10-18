@@ -1,0 +1,18 @@
+{% set leader = rows[0].points if rows else 0 %}
+<div class="table-wrap">
+<table>
+  <thead><tr><th class="num">Pos</th><th>{{ 'Driver' if kind == 'drivers' else 'Team' }}</th>{% if kind == 'drivers' %}<th class="hide-sm">Team</th>{% endif %}<th class="num">Wins</th><th class="num">Points</th><th class="num">Gap</th></tr></thead>
+  <tbody>
+  {% for r in rows %}
+  <tr>
+    <td class="num pos">{{ r.position or '' }}</td>
+    <td>{% if kind == 'drivers' %}<b>{{ r.code }}</b> <span class="secondary">{{ r.name }}</span>{% else %}{{ r.name }}{% endif %}</td>
+    {% if kind == 'drivers' %}<td class="hide-sm secondary">{{ r.team }}</td>{% endif %}
+    <td class="num">{{ r.wins }}</td>
+    <td class="num"><b>{{ r.points|points }}</b></td>
+    <td class="num muted">{% if not loop.first %}−{{ (leader - r.points)|points }}{% endif %}</td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>

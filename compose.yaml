@@ -1,0 +1,17 @@
+services:
+  f1dash:
+    build: .
+    image: f1dash:latest
+    container_name: f1dash
+    restart: unless-stopped
+    ports:
+      - "${F1DASH_PORT:-8050}:8000"
+    env_file:
+      - path: .env
+        required: false
+    volumes:
+      - f1dash-cache:/data
+    mem_limit: 768m
+
+volumes:
+  f1dash-cache:

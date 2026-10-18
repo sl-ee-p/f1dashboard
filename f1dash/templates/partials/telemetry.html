@@ -1,0 +1,32 @@
+<form class="tele-form" hx-get="{{ url_for('pages.telemetry', session_key=s.session_key) }}" hx-target="#telemetry-panel" hx-swap="innerHTML" hx-trigger="change" hx-indicator="#telemetry-panel">
+  {% for key, lapkey, sel, sellap, slot in (('a', 'la', a, la, 1), ('b', 'lb', b, lb, 2)) %}
+  <label><span><i class="key s{{ slot }}" aria-hidden="true"></i> Driver {{ slot }}</span>
+    <select name="{{ key }}">
+      {% for n in order %}<option value="{{ n }}" {% if n == sel %}selected{% endif %}>{{ drivers[n].code }} · {{ drivers[n].name }}</option>{% endfor %}
+    </select>
+  </label>
+  <label>Lap
+    <select name="{{ lapkey }}">
+      <option value="">Fastest</option>
+      {% for l in laps.get(sel, []) %}<option value="{{ l.lap }}" {% if l.lap == sellap %}selected{% endif %}>Lap {{ l.lap }} · {{ l.time }}</option>{% endfor %}
+    </select>
+  </label>
+  {% endfor %}
+  <noscript><button class="btn" type="submit">Compare</button></noscript>
+</form>
+{% if data.drivers|length < 2 %}
+  <p class="panel-error muted">No car data for one of these laps.</p>
+{% else %}
+<p class="tele-head">
+  {% for d in data.drivers %}<span><i class="key s{{ d.slot }}" aria-hidden="true"></i><b>{{ d.code }}</b> lap {{ d.lap }} · <span class="num">{{ d.time }}</span></span>{% endfor %}
+</p>
+<div class="grid">
+  <div class="span-8">{% with chart=data, chart_id='tele-' ~ s.session_key %}{% include "partials/chart.html" %}{% endwith %}</div>
+  <div class="span-4">
+    {% if data.track %}
+    {% with chart={'kind': 'track', 'title': 'Track map: who was faster through each mini-sector', 'track': data.track, 'drivers': data.drivers}, chart_id='track-' ~ s.session_key %}{% include "partials/chart.html" %}{% endwith %}
+    <p class="legend-note">Track coloured by the driver with the higher average speed in each of 25 mini-sectors. Corner numbers from MultiViewer.</p>
+    {% endif %}
+  </div>
+</div>
+{% endif %}

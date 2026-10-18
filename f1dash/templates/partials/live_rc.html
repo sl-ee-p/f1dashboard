@@ -1,0 +1,5 @@
+{% if messages %}
+<ul class="rc-list">
+  {% for m in messages %}<li><span class="when">{% if m.lap %}L{{ m.lap }}{% endif %}</span><span>{{ m.message }}</span></li>{% endfor %}
+</ul>
+{% else %}<p class="muted">No messages yet.</p>{% endif %}

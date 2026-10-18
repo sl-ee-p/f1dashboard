@@ -1,0 +1,5 @@
+<figure class="chart{{ ' tall' if chart.kind in ('telemetry',) }}" id="{{ chart_id }}" data-chart>
+  <div class="plot" role="img" aria-label="{{ chart.title }}"></div>
+  <script type="application/json" class="chart-data">{{ chart|tojson_attr }}</script>
+  <details><summary>Show data table</summary><div class="table-wrap"></div></details>
+</figure>

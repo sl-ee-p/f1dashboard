@@ -1,0 +1,19 @@
+<div class="table-wrap">
+<table class="tower">
+  <thead><tr><th class="num">Pos</th><th>Driver</th><th class="num">Gap</th><th class="num">Int</th><th class="num">Last lap</th><th class="num hide-sm">Best</th><th>Tyre</th><th class="num hide-sm">Stops</th></tr></thead>
+  <tbody>
+  {% for r in rows %}
+  <tr class="{{ 'retired' if r.retired }}">
+    <td class="num pos">{{ r.position or '' }}</td>
+    <td><span class="team-swatch" style="background:{{ r.colour }}" aria-hidden="true"></span><b>{{ r.code }}</b>{% if r.in_pit %} <span class="pit">PIT</span>{% endif %}{% if r.retired %} <span class="pit">OUT</span>{% endif %}</td>
+    <td class="num">{{ r.gap }}</td>
+    <td class="num">{{ r.interval }}</td>
+    <td class="num">{{ r.last }}</td>
+    <td class="num hide-sm">{% if r.fastest %}<span class="badge fastest">{{ r.best }}</span>{% else %}{{ r.best }}{% endif %}</td>
+    <td>{% if r.compound %}<span class="tyre {{ r.compound }}" title="{{ r.compound|title }}">{{ r.compound|compound_letter }}</span> <span class="num muted">{{ r.tyre_age if r.tyre_age is not none }}</span>{% endif %}</td>
+    <td class="num hide-sm">{{ r.pits }}</td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
