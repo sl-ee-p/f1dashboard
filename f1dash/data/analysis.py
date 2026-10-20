@@ -53,6 +53,23 @@ def _num(value):
     return value
 
 
+def _int(value) -> int | None:
+    """Whole numbers such as lap counts: NaN/None -> None, 57.0 -> 57.
+
+    One missing value turns a whole pandas column into float64, which would
+    otherwise show up as "57.0" in tables and JSON.
+    """
+    value = _num(value)
+    if isinstance(value, int | float):
+        return int(value)
+    return None
+
+
+def _str(value) -> str:
+    """Text cells: None/NaN -> ""."""
+    return value if isinstance(value, str) else ""
+
+
 def is_race(session: dict) -> bool:
     return session.get("session_type") in RACE_TYPES
 
@@ -227,7 +244,7 @@ def neutralisations(race_control: pd.DataFrame, last_lap: int | None = None) -> 
             periods.append({"kind": kind, "start": start, "end": int(lap or start)})
 
     for row in rc.itertuples():
-        msg = (row.message or "").upper()
+        msg = _str(row.message).upper()
         lap = _num(row.lap_number)
         flag = (row.flag or "").upper() if isinstance(row.flag, str) else ""
         if lap is None:
@@ -269,7 +286,7 @@ def stint_rows(stints: pd.DataFrame, order: list[int], laps: pd.DataFrame) -> li
             end = _num(r.lap_end) or last_lap.get(number)
             if start is None or end is None:
                 continue
-            compound = (r.compound or "UNKNOWN").upper()
+            compound = _str(r.compound).upper() or "UNKNOWN"
             rows.append(
                 {
                     "stint": int(r.stint_number),
@@ -277,7 +294,7 @@ def stint_rows(stints: pd.DataFrame, order: list[int], laps: pd.DataFrame) -> li
                     "start": int(start),
                     "end": int(end),
                     "laps": int(end) - int(start) + 1,
-                    "age_start": _num(r.tyre_age_at_start),
+                    "age_start": _int(r.tyre_age_at_start),
                 }
             )
         if rows:
@@ -340,7 +357,7 @@ def results_rows(
             "name": drv.name,
             "team": drv.team,
             "colour": drv.colour,
-            "laps": _num(getattr(r, "number_of_laps", None)),
+            "laps": _int(getattr(r, "number_of_laps", None)),
             "status": status,
             "best_lap": fmt_laptime(best.get(number, {}).get("time")),
             "best_lap_is_fastest": bool(

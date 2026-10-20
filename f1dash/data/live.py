@@ -214,7 +214,8 @@ def build_timeline(
                     )
                 )
     for r in stints.itertuples():
-        start = lap_starts.get((int(r.driver_number), int(r.lap_start or 1)))
+        lap_start = A._int(r.lap_start) or 1
+        start = lap_starts.get((int(r.driver_number), lap_start))
         if start is None:
             continue
         events.append(
@@ -223,9 +224,9 @@ def build_timeline(
                 "stint",
                 {
                     "driver": int(r.driver_number),
-                    "compound": (r.compound or "").upper() or None,
-                    "lap_start": int(r.lap_start or 1),
-                    "age": A._num(r.tyre_age_at_start),
+                    "compound": A._str(r.compound).upper() or None,
+                    "lap_start": lap_start,
+                    "age": A._int(r.tyre_age_at_start),
                 },
             )
         )
@@ -245,11 +246,11 @@ def build_timeline(
                 r.date,
                 "rc",
                 {
-                    "message": r.message,
-                    "flag": r.flag if isinstance(r.flag, str) else None,
+                    "message": A._str(r.message),
+                    "flag": A._str(r.flag) or None,
                     "category": r.category,
-                    "scope": r.scope if isinstance(r.scope, str) else None,
-                    "lap": A._num(r.lap_number),
+                    "scope": A._str(r.scope) or None,
+                    "lap": A._int(r.lap_number),
                 },
             )
         )

@@ -219,15 +219,16 @@ class Dashboard:
         start = pd.Timestamp(session["date_start"])
         out = []
         for r in rc.sort_values("date").itertuples():
-            if "BLUE FLAG" in (r.message or ""):
+            message = A._str(r.message)
+            if "BLUE FLAG" in message:
                 continue
             out.append(
                 {
                     "minute": int((r.date - start).total_seconds() // 60),
-                    "lap": A._num(r.lap_number),
+                    "lap": A._int(r.lap_number),
                     "category": r.category,
-                    "flag": r.flag if isinstance(r.flag, str) else None,
-                    "message": r.message,
+                    "flag": A._str(r.flag) or None,
+                    "message": message,
                 }
             )
         return out

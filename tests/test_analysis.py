@@ -1,3 +1,4 @@
+import numpy as np
 import pandas as pd
 import pytest
 
@@ -134,6 +135,22 @@ def test_stints_fill_missing_end_lap():
         "laps": 20,
         "age_start": 3,
     }
+
+
+def test_whole_numbers_survive_missing_values():
+    assert A._int(np.float64(57.0)) == 57 and isinstance(A._int(np.float64(57.0)), int)
+    assert A._int(float("nan")) is None
+    assert A._int(None) is None
+    results = pd.DataFrame(
+        [
+            {"driver_number": 1, "position": 1, "number_of_laps": 57},
+            {"driver_number": 2, "position": 2, "number_of_laps": None},
+        ]
+    )
+    laps = laps_frame([(1, 1, 0, 90), (2, 1, 0, 91)])
+    rows = A.results_rows({"session_type": "Practice"}, results, {}, laps)
+    assert [r["laps"] for r in rows] == [57, None]
+    assert isinstance(rows[0]["laps"], int)
 
 
 def test_time_delta_of_identical_laps_is_zero():
