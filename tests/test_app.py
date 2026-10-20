@@ -86,6 +86,14 @@ def test_telemetry_panel(client):
     assert '"kind":"track"' in html
 
 
+def test_odd_query_values_are_ignored(client):
+    odd = {"a": "²", "b": "16", "la": "9" * 5000, "focus": "²,16"}
+    assert client.get(f"/session/{RACE}/telemetry", query_string=odd).status_code == 200
+    assert client.get(f"/session/{RACE}/panel/gaps", query_string=odd).status_code == 200
+    assert client.get(f"/api/v1/sessions/{RACE}/telemetry", query_string=odd).status_code == 400
+    assert client.get("/live", query_string={"session": "²", "speed": "²"}).status_code == 200
+
+
 def test_unknown_things_404(client):
     assert client.get("/session/1").status_code == 404
     assert client.get(f"/session/{RACE}/panel/nope").status_code == 404

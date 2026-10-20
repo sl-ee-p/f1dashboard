@@ -2,7 +2,7 @@ import pandas as pd
 import pytest
 
 from f1dash.data import analysis as A
-from f1dash.services import parse_focus
+from f1dash.services import parse_focus, parse_int
 
 T0 = pd.Timestamp("2026-01-01T12:00:00Z")
 
@@ -187,6 +187,18 @@ def test_parse_focus():
     assert parse_focus("16,16,99,x", valid, [44]) == [16]
     assert parse_focus("", valid, [44, 1]) == [44, 1]
     assert parse_focus("1,16,44,81", valid, []) == [1, 16, 44]
+    assert parse_focus("²,16", valid, []) == [16]
+
+
+def test_parse_int_rejects_what_int_cannot_read():
+    assert parse_int("16") == 16
+    assert parse_int(" 7 ") == 7
+    assert parse_int(None) is None
+    assert parse_int("") is None
+    assert parse_int("-1") is None
+    assert parse_int("²") is None
+    assert parse_int("١٦") is None
+    assert parse_int("9" * 5000) is None
 
 
 def test_race_results_from_real_data(hub, race):

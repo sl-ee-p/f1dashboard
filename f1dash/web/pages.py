@@ -9,7 +9,7 @@ from flask import Blueprint, abort, current_app, redirect, render_template, requ
 from ..data import analysis as A
 from ..data.http import UpstreamError
 from ..data.sources import FIRST_OPENF1_YEAR
-from ..services import Dashboard
+from ..services import Dashboard, parse_int
 from .limits import limited
 
 bp = Blueprint("pages", __name__)
@@ -32,8 +32,7 @@ def focus_raw() -> str:
 
 
 def _int_arg(name: str) -> int | None:
-    value = request.args.get(name, "")
-    return int(value) if value.isdigit() else None
+    return parse_int(request.args.get(name))
 
 
 @bp.get("/")

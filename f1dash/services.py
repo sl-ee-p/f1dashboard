@@ -37,13 +37,25 @@ class NoSuchSession(LookupError):
     pass
 
 
+def parse_int(raw: str | None) -> int | None:
+    """A plain non-negative integer from a query string, or None.
+
+    ``str.isdigit`` alone also accepts characters such as "²" that ``int``
+    rejects, and very long digit strings exceed Python's conversion limit.
+    """
+    raw = (raw or "").strip()
+    if not raw.isascii() or not raw.isdigit() or len(raw) > 9:
+        return None
+    return int(raw)
+
+
 def parse_focus(raw: str | None, valid: set[int], fallback: list[int]) -> list[int]:
     """``?focus=1,16,44`` -> up to three valid driver numbers, in the given order."""
     out: list[int] = []
     for part in (raw or "").split(","):
-        part = part.strip()
-        if part.isdigit() and int(part) in valid and int(part) not in out:
-            out.append(int(part))
+        number = parse_int(part)
+        if number is not None and number in valid and number not in out:
+            out.append(number)
     return (out or fallback)[:MAX_FOCUS]
 
 
