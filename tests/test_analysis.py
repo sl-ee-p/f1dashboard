@@ -198,6 +198,24 @@ def test_unpublished_session_has_no_rows():
     assert A.weather_summary(empty) is None
 
 
+def test_points_progression_keeps_drivers_with_the_same_code_apart():
+    def res(driver_id, given, family, pts):
+        return {
+            "Driver": {"driverId": driver_id, "givenName": given, "familyName": family},
+            "Constructor": {"name": "BRM"},
+            "points": str(pts),
+        }
+
+    drivers = [
+        res("hill", "Graham", "Hill", 9),
+        res("phil_hill", "Phil", "Hill", 6),
+        res("surtees", "John", "Surtees", 4),
+    ]
+    prog = A.points_progression([{"round": "1", "Results": drivers}], [])
+    assert prog["drivers"] == {"G. Hill": [9], "P. Hill": [6], "SUR": [4]}
+    assert prog["teams"] == {"BRM": [19]}
+
+
 def test_parse_focus():
     valid = {1, 16, 44, 81}
     assert parse_focus("16,1", valid, [44]) == [16, 1]

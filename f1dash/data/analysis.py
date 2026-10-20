@@ -514,28 +514,54 @@ def weather_series(weather: pd.DataFrame, start: pd.Timestamp) -> dict:
 # ---------------------------------------------------------------------------
 # season
 # ---------------------------------------------------------------------------
+def _unique_labels(candidates: dict[str, list[str]]) -> dict[str, str]:
+    """For each key, the first of its labels that no other key has at that level."""
+    out: dict[str, str] = {}
+    for key, options in candidates.items():
+        out[key] = key
+        for level, label in enumerate(options):
+            if all(other[level] != label for k, other in candidates.items() if k != key):
+                out[key] = label
+                break
+    return out
+
+
 def points_progression(results: list[dict], sprints: list[dict]) -> dict:
-    """Cumulative driver and constructor points after each round."""
-    by_round: dict[int, list[tuple[str, str, str, float]]] = {}
+    """Cumulative driver and constructor points after each round.
+
+    Drivers are labelled by their three-letter code. Older seasons often have
+    no codes, and the fallback (start of the family name) can clash, e.g.
+    Graham and Phil Hill, so clashing drivers get a longer label instead of
+    having their points merged.
+    """
+    by_round: dict[int, list[tuple[str, str, float]]] = {}
+    labels: dict[str, list[str]] = {}
     for race in results + sprints:
         rnd = int(race["round"])
         for r in race.get("Results", []) + race.get("SprintResults", []):
-            by_round.setdefault(rnd, []).append(
-                (
-                    r["Driver"].get("code") or r["Driver"]["familyName"][:3].upper(),
-                    r["Constructor"]["name"],
-                    r["Driver"]["driverId"],
-                    float(r.get("points", 0)),
-                )
+            driver = r["Driver"]
+            family, given = driver["familyName"], driver.get("givenName", "")
+            labels.setdefault(
+                driver["driverId"],
+                [
+                    driver.get("code") or family[:3].upper(),
+                    f"{given[:1]}. {family}" if given else family,
+                    driver["driverId"],
+                ],
             )
+            by_round.setdefault(rnd, []).append(
+                (driver["driverId"], r["Constructor"]["name"], float(r.get("points", 0)))
+            )
+    names = _unique_labels(labels)
     rounds = sorted(by_round)
     drivers: dict[str, list[float]] = {}
     teams: dict[str, list[float]] = {}
     for i, rnd in enumerate(rounds):
-        for code, team, _id, pts in by_round[rnd]:
-            drivers.setdefault(code, [0.0] * len(rounds))
+        for driver_id, team, pts in by_round[rnd]:
+            name = names[driver_id]
+            drivers.setdefault(name, [0.0] * len(rounds))
             teams.setdefault(team, [0.0] * len(rounds))
-            drivers[code][i] += pts
+            drivers[name][i] += pts
             teams[team][i] += pts
 
     def cumulate(table):
