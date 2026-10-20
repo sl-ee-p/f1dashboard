@@ -34,7 +34,11 @@ class NotFound(UpstreamError):
 
 
 class RateLimited(UpstreamError):
-    """We are out of request budget for an upstream host right now."""
+    """We are not sending requests to an upstream host right now.
+
+    Either the request budget is spent, the host asked us to back off, or it
+    just failed every retry and is cooling down.
+    """
 
 
 @dataclass
@@ -48,7 +52,13 @@ class HostBudget:
     updated: float = 0.0
     last: float = 0.0
     blocked_until: float = 0.0
+    blocked_reason: str = ""
     lock: threading.Lock = field(default_factory=threading.Lock)
+
+    def block(self, seconds: float, reason: str) -> None:
+        """Refuse requests for ``seconds`` without touching the network."""
+        self.blocked_until = time.monotonic() + seconds
+        self.blocked_reason = reason
 
     def take(self, max_wait: float) -> None:
         with self.lock:
@@ -57,7 +67,8 @@ class HostBudget:
                 self.tokens, self.updated = float(self.burst), now
             if now < self.blocked_until:
                 raise RateLimited(
-                    f"upstream asked us to back off for {self.blocked_until - now:.0f}s"
+                    f"{self.blocked_reason or 'backing off'}; "
+                    f"next try in {self.blocked_until - now:.0f}s"
                 )
             rate = self.per_minute / 60
             self.tokens = min(self.burst, self.tokens + (now - self.updated) * rate)
@@ -89,10 +100,17 @@ class Fetcher:
         cache_dir: Path,
         min_interval: float = 0.5,
         retries: int = 3,
-        timeout: float = 30.0,
+        timeout: float | tuple[float, float] = (5.0, 30.0),
         offline: bool = False,
         max_wait: float = 8.0,
+        cooldown: float = 30.0,
     ) -> None:
+        """``timeout`` is (connect, read) seconds per attempt.
+
+        After a host fails every retry, calls to it fail fast (or serve stale
+        data) for ``cooldown`` seconds instead of each one waiting through the
+        timeouts and retries again.
+        """
         cache_dir.mkdir(parents=True, exist_ok=True)
         self.session = requests_cache.CachedSession(
             str(cache_dir / "http_cache"),
@@ -108,6 +126,7 @@ class Fetcher:
         self.timeout = timeout
         self.offline = offline
         self.max_wait = max_wait
+        self.cooldown = cooldown
         self._budgets: dict[str, HostBudget] = {}
         self._guard = threading.Lock()
 
@@ -147,10 +166,11 @@ class Fetcher:
                 resp = self.session.get(
                     url, params=params, expire_after=expire, timeout=self.timeout
                 )
-            except RateLimited:
-                return self._stale_or_raise(req, url)
+            except RateLimited as exc:
+                return self._stale_or_raise(req, url, RateLimited(f"{exc} ({url} not cached)"))
             except requests.RequestException as exc:
                 if attempt == self.retries:
+                    budget.block(self.cooldown, f"{host} unreachable")
                     stale = self._cached(req, allow_expired=True)
                     if stale is not None:
                         return self._decode(stale, url)
@@ -163,26 +183,32 @@ class Fetcher:
             if resp.status_code == 429:
                 retry_after = resp.headers.get("Retry-After", "")
                 pause = float(retry_after) if retry_after.isdigit() else 10.0
-                budget.blocked_until = time.monotonic() + pause
+                budget.block(pause, f"{host} rate limited us")
                 log.warning("%s rate limited us for %.0fs", host, pause)
                 if pause > self.max_wait or attempt == self.retries:
-                    return self._stale_or_raise(req, url)
+                    error = RateLimited(f"rate limited and not cached: {url}")
+                    return self._stale_or_raise(req, url, error)
                 time.sleep(pause)
                 budget.blocked_until = 0.0
                 continue
-            if resp.status_code >= 500 and attempt < self.retries:
-                log.warning("%s returned %s, retrying in %.1fs", host, resp.status_code, delay)
-                time.sleep(delay)
-                delay *= 2
-                continue
+            if resp.status_code >= 500:
+                if attempt < self.retries:
+                    log.warning("%s returned %s, retrying in %.1fs", host, resp.status_code, delay)
+                    time.sleep(delay)
+                    delay *= 2
+                    continue
+                budget.block(self.cooldown, f"{host} returned HTTP {resp.status_code}")
+                error = UpstreamError(f"{url} returned HTTP {resp.status_code}")
+                return self._stale_or_raise(req, url, error)
             return self._decode(resp, url)
         raise UpstreamError(f"{host} kept failing")  # pragma: no cover
 
-    def _stale_or_raise(self, req, url: str):
+    def _stale_or_raise(self, req, url: str, error: UpstreamError):
         stale = self._cached(req, allow_expired=True)
         if stale is not None:
+            log.info("serving an expired cached copy of %s (%s)", url, error)
             return self._decode(stale, url)
-        raise RateLimited(f"rate limited and not cached: {url}")
+        raise error
 
     @staticmethod
     def _decode(resp, url: str):

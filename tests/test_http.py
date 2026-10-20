@@ -1,6 +1,7 @@
 import pytest
+import requests
 
-from f1dash.data.http import Fetcher, HostBudget, RateLimited
+from f1dash.data.http import Fetcher, HostBudget, RateLimited, UpstreamError
 
 
 def test_budget_refuses_long_waits():
@@ -34,4 +35,33 @@ def test_long_retry_after_fails_fast(tmp_path, monkeypatch):
     # The host stays blocked: the next call doesn't even hit the network.
     with pytest.raises(RateLimited):
         f.get_json("https://api.openf1.org/v1/stints", {"session_key": 1})
+    assert len(calls) == 1
+
+
+def test_unreachable_host_cools_down(tmp_path, monkeypatch):
+    f = Fetcher(tmp_path, min_interval=0, retries=0)
+    calls = []
+
+    def refuse(*a, **k):
+        calls.append(1)
+        raise requests.ConnectionError("connection refused")
+
+    monkeypatch.setattr(f.session, "get", refuse)
+    with pytest.raises(UpstreamError):
+        f.get_json("https://api.openf1.org/v1/laps", {"session_key": 1})
+    assert len(calls) == 1
+    # Later calls fail straight away instead of waiting through timeouts again.
+    with pytest.raises(UpstreamError):
+        f.get_json("https://api.openf1.org/v1/stints", {"session_key": 1})
+    assert len(calls) == 1
+
+
+def test_server_errors_cool_down(tmp_path, monkeypatch):
+    f = Fetcher(tmp_path, min_interval=0, retries=0)
+    calls = []
+    monkeypatch.setattr(f.session, "get", lambda *a, **k: calls.append(1) or FakeResponse(502))
+    with pytest.raises(UpstreamError):
+        f.get_json("https://api.jolpi.ca/ergast/f1/2026.json")
+    with pytest.raises(UpstreamError):
+        f.get_json("https://api.jolpi.ca/ergast/f1/2025.json")
     assert len(calls) == 1

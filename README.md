@@ -48,7 +48,8 @@ Flask (gunicorn gthread, 1 worker)
         └─ data/sources.py   OpenF1 · Jolpica · MultiViewer clients
               └─ data/http.py  disk cache (requests-cache/SQLite),
                                per-host token-bucket rate limits,
-                               stale-on-error, fail-fast on long 429s
+                               stale-on-error, fail-fast on long 429s,
+                               30 s cooldown for a host that is down
 ```
 
 - **No JS build step.** The browser renders semantic chart data from the server (`static/js/charts.js`), themed from CSS custom properties.
