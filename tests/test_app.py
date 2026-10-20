@@ -132,6 +132,20 @@ def test_live_stream_first_frames(client):
     assert "VER" in text
 
 
+def test_live_stream_without_a_session_tells_the_page_to_stop(client):
+    resp = client.get("/live/stream")
+    assert resp.mimetype == "text/event-stream"
+    text = resp.get_data(as_text=True)
+    assert "event: status" in text and "event: end" in text
+
+
+def test_live_stream_of_a_session_without_data(bare_client):
+    resp = bare_client.get(f"/live/stream?session={SPRINT}&speed=60")
+    text = resp.get_data(as_text=True)
+    assert "event: tower" in text and "replay finished" in text
+    assert text.rstrip().endswith("event: end\ndata:")
+
+
 def test_security_headers(client):
     resp = client.get("/healthz")
     assert resp.headers["X-Content-Type-Options"] == "nosniff"

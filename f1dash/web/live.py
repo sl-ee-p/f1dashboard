@@ -4,12 +4,15 @@ from __future__ import annotations
 
 import threading
 import time
+from collections.abc import Iterable
 
 import pandas as pd
 from flask import Blueprint, Response, current_app, render_template, stream_with_context
 
 from ..data import analysis as A
 from ..data import live as L
+from ..data.http import UpstreamError
+from ..services import NoSuchSession
 from .limits import limited
 from .pages import _int_arg, dash
 
@@ -17,16 +20,17 @@ bp = Blueprint("live", __name__)
 
 SPEEDS = (1, 5, 20, 60)
 MAX_STREAM_SECONDS = 3 * 3600
-_slots: threading.BoundedSemaphore | None = None
 _slots_lock = threading.Lock()
 
 
 def _semaphore() -> threading.BoundedSemaphore:
-    global _slots
+    """Stream slots for this app (per app, so each app's config applies)."""
     with _slots_lock:
-        if _slots is None:
-            _slots = threading.BoundedSemaphore(current_app.config["F1DASH"].max_live_streams)
-        return _slots
+        slots = current_app.extensions.get("live_slots")
+        if slots is None:
+            slots = threading.BoundedSemaphore(current_app.config["F1DASH"].max_live_streams)
+            current_app.extensions["live_slots"] = slots
+        return slots
 
 
 def _replay_sessions() -> list[dict]:
@@ -72,6 +76,15 @@ def _sse(event: str, html: str) -> str:
     return f"event: {event}\n{data}\n\n"
 
 
+def _notice(html: str) -> str:
+    """A status message followed by ``end``, which tells the page to stop.
+
+    Without ``end``, the browser would reconnect every few seconds to get
+    the same answer again.
+    """
+    return _sse("status", html) + _sse("end", "")
+
+
 @bp.get("/live/stream")
 @limited(rate=0.2, burst=4)
 def stream():
@@ -79,28 +92,38 @@ def stream():
     key = _int_arg("session")
     speed = _int_arg("speed") or 20
     speed = speed if speed in SPEEDS else 20
-    if not cfg.live_enabled or key is None:
-        return Response(_sse("status", "Live timing is disabled."), mimetype="text/event-stream")
+    if not cfg.live_enabled:
+        return _event_stream(_notice("<p>Live timing is turned off on this server.</p>"))
+    if key is None:
+        return _event_stream(_notice("<p>Pick a race to replay.</p>"))
 
     d = dash()
-    s = d.session(key)
     of = d.of
-    laps = of.laps(s)
-    events = L.build_timeline(
-        laps,
-        of.positions(s),
-        of.intervals(s),
-        of.stints(s),
-        of.pits(s),
-        of.race_control(s),
-    )
+    try:
+        s = d.session(key)
+        laps = of.laps(s)
+        events = L.build_timeline(
+            laps,
+            of.positions(s),
+            of.intervals(s),
+            of.stints(s),
+            of.pits(s),
+            of.race_control(s),
+        )
+        drivers = A.driver_map(of.drivers(s))
+        meeting = of.meeting(s["meeting_key"], s["year"]) or {}
+    except NoSuchSession:
+        return _event_stream(_notice("<p>There is no such session to replay.</p>"))
+    except UpstreamError as exc:
+        current_app.logger.warning("live replay of %s failed: %s", key, exc)
+        return _event_stream(
+            _notice("<p>The data source didn't answer. Reload to try again shortly.</p>")
+        )
     total_laps = int(laps["lap_number"].max()) if not laps.empty else None
-    state = L.TimingState(A.driver_map(of.drivers(s)), total_laps)
+    state = L.TimingState(drivers, total_laps)
     start = L.replay_start(laps, s, _int_arg("lap"))
     replay = L.Replay(state, events, start)
-    title = (
-        f"{(d.of.meeting(s['meeting_key'], s['year']) or {}).get('meeting_name', '')} {s['year']}"
-    )
+    title = f"{meeting.get('meeting_name', '')} {s['year']}"
     slots = _semaphore()
 
     def render(final: bool = False) -> str:
@@ -123,7 +146,7 @@ def stream():
     @stream_with_context
     def generate():
         if not slots.acquire(blocking=False):
-            yield _sse("status", "<p>Too many live viewers right now. Try again later.</p>")
+            yield _notice("<p>Too many live viewers right now. Reload to try again later.</p>")
             return
         try:
             yield "retry: 15000\n\n"
@@ -142,8 +165,12 @@ def stream():
         finally:
             slots.release()
 
+    return _event_stream(generate())
+
+
+def _event_stream(body: str | Iterable[str]) -> Response:
     return Response(
-        generate(),
+        body,
         mimetype="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
