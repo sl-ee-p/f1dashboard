@@ -11,6 +11,9 @@ from f1dash.data.sources import DataHub
 
 FIXTURES = Path(__file__).parent / "fixtures" / "upstream.json.gz"
 RACE, QUALI = 11388, 11384
+# The weekend's sprint is on the calendar but has no recorded timing data, like a
+# session that hasn't run yet.
+SPRINT = 11383
 
 
 class FixtureFetcher:
@@ -67,3 +70,17 @@ def race(hub):
 @pytest.fixture(scope="session")
 def quali(hub):
     return hub.openf1.session(QUALI)
+
+
+@pytest.fixture(scope="session")
+def bare_client(tmp_path_factory):
+    """Client for an app that can look up SPRINT, which has no timing data at all."""
+    fetcher = FixtureFetcher()
+    weekend = fetcher.data["https://api.openf1.org/v1/sessions?meeting_key=1296"]
+    fetcher.data[f"https://api.openf1.org/v1/sessions?session_key={SPRINT}"] = [
+        s for s in weekend if s["session_key"] == SPRINT
+    ]
+    config = Config(cache_dir=tmp_path_factory.mktemp("cache3"), secret_key="test")
+    app = create_app(config, hub=DataHub(config, fetcher=fetcher))
+    app.config["TESTING"] = True
+    return app.test_client()

@@ -94,6 +94,8 @@ def panel(session_key: int, name: str):
     try:
         if name == "results":
             rows, _ = d.results(s)
+            if not rows:
+                return render_template("partials/empty.html")
             return render_template(
                 "partials/results.html", rows=rows, is_race=A.is_race(s), is_quali=A.is_quali(s)
             )

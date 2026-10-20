@@ -112,6 +112,8 @@ def lap_end_times(laps: pd.DataFrame) -> pd.DataFrame:
 
 def best_laps(laps: pd.DataFrame) -> dict[int, dict]:
     """Fastest valid lap per driver: {driver: {lap, time}}."""
+    if laps.empty:
+        return {}
     valid = laps.dropna(subset=["lap_duration"])
     if valid.empty:
         return {}
@@ -124,6 +126,8 @@ def best_laps(laps: pd.DataFrame) -> dict[int, dict]:
 
 def quick_laps(laps: pd.DataFrame, threshold: float = 1.07) -> pd.DataFrame:
     """Representative laps: no pit-out laps, no lap 1, within 107% of the best lap."""
+    if laps.empty:
+        return laps
     df = laps.dropna(subset=["lap_duration"])
     if df.empty:
         return df
@@ -135,6 +139,8 @@ def quick_laps(laps: pd.DataFrame, threshold: float = 1.07) -> pd.DataFrame:
 
 def lap_time_series(laps: pd.DataFrame, order: list[int], quick: bool = True) -> list[dict]:
     """Per-driver lap times for the distribution chart, in finishing order."""
+    if laps.empty:
+        return []
     df = quick_laps(laps) if quick else laps.dropna(subset=["lap_duration"])
     out = []
     for number in order:
@@ -301,6 +307,9 @@ def results_rows(
     if results.empty:
         # Fall back to best laps (e.g. data still being published).
         ranked = sorted(best.items(), key=lambda kv: kv[1]["time"])
+        if not ranked:
+            # Nothing published yet, e.g. a session that hasn't run.
+            return []
         results = pd.DataFrame(
             [{"driver_number": n, "position": i + 1} for i, (n, _) in enumerate(ranked)]
         )

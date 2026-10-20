@@ -1,6 +1,6 @@
 import pytest
 
-from .conftest import QUALI, RACE
+from .conftest import QUALI, RACE, SPRINT
 
 
 @pytest.mark.parametrize(
@@ -27,6 +27,35 @@ def test_race_panels(client, name):
     resp = client.get(f"/session/{RACE}/panel/{name}?focus=3,16")
     assert resp.status_code == 200
     assert b"panel-error" not in resp.data or name == "racecontrol"
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        f"/session/{SPRINT}",
+        f"/session/{SPRINT}/panel/results",
+        f"/session/{SPRINT}/panel/positions",
+        f"/session/{SPRINT}/panel/gaps",
+        f"/session/{SPRINT}/panel/laptimes",
+        f"/session/{SPRINT}/panel/stints",
+        f"/session/{SPRINT}/panel/weather",
+        f"/session/{SPRINT}/panel/racecontrol",
+        f"/session/{SPRINT}/telemetry",
+        f"/session/{SPRINT}/telemetry?a=3&b=16",
+        f"/api/v1/sessions/{SPRINT}",
+        f"/api/v1/sessions/{SPRINT}/charts/laptimes",
+        f"/api/v1/sessions/{SPRINT}/telemetry?a=3&b=16",
+    ],
+)
+def test_session_without_data_renders(bare_client, path):
+    resp = bare_client.get(path)
+    assert resp.status_code == 200, resp.data[:500]
+
+
+def test_session_without_data_shows_empty_state(bare_client):
+    html = bare_client.get(f"/session/{SPRINT}/panel/results").get_data(as_text=True)
+    assert "No data published" in html
+    assert bare_client.get(f"/api/v1/sessions/{SPRINT}").get_json()["results"] == []
 
 
 def test_results_panel_content(client):

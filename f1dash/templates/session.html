@@ -35,7 +35,7 @@
 
 <form class="filters" method="get" action="{{ url_for('pages.session', session_key=s.session_key) }}" data-focus-form data-initial="{{ focus_arg }}">
   <span class="label" id="focus-label">Highlight up to 3 drivers</span>
-  {% for n in order %}{% set d = drivers[n] %}{% set slot = focus.index(n) + 1 if n in focus else 0 %}
+  {% for n in order if n in drivers %}{% set d = drivers[n] %}{% set slot = focus.index(n) + 1 if n in focus else 0 %}
   <label class="chip" title="{{ d.name }} · {{ d.team }}">
     <input type="checkbox" name="focus" value="{{ n }}" {% if slot %}checked{% endif %} aria-describedby="focus-label">
     <span><i class="key {% if slot %}s{{ slot }}{% endif %}"></i>{{ d.code }}</span>

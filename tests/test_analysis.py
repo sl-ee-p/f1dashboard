@@ -167,6 +167,20 @@ def test_points_progression_accumulates_races_and_sprints():
     assert prog["teams"]["T2"] == [18, 43]
 
 
+def test_unpublished_session_has_no_rows():
+    # OpenF1 answers 404 for tables with no rows, which become frames without columns.
+    empty = pd.DataFrame()
+    session = {"session_type": "Race", "date_start": "2026-01-01T12:00:00+00:00"}
+    assert A.best_laps(empty) == {}
+    assert A.quick_laps(empty).empty
+    assert A.lap_time_series(empty, [1, 16]) == []
+    assert A.results_rows(session, empty, {}, empty, {}, empty) == []
+    assert A.gap_to_leader_by_lap(empty).empty
+    assert A.position_by_lap(empty, empty).empty
+    assert A.stint_rows(empty, [1], empty) == []
+    assert A.weather_summary(empty) is None
+
+
 def test_parse_focus():
     valid = {1, 16, 44, 81}
     assert parse_focus("16,1", valid, [44]) == [16, 1]

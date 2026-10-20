@@ -222,8 +222,11 @@ class Dashboard:
 
     # ---------------------------------------------------------------- telemetry
     def lap_choices(self, session: dict) -> dict[int, list[dict]]:
-        laps = self.of.laps(session).dropna(subset=["lap_duration"])
+        laps = self.of.laps(session)
         out: dict[int, list[dict]] = {}
+        if laps.empty:
+            return out
+        laps = laps.dropna(subset=["lap_duration"])
         for r in laps.sort_values(["driver_number", "lap_number"]).itertuples():
             out.setdefault(int(r.driver_number), []).append(
                 {"lap": int(r.lap_number), "time": A.fmt_laptime(r.lap_duration)}
@@ -231,6 +234,8 @@ class Dashboard:
         return out
 
     def _lap_window(self, laps: pd.DataFrame, driver: int, lap: int | None):
+        if laps.empty:
+            return None
         d = laps[(laps["driver_number"] == driver)].dropna(subset=["lap_duration", "date_start"])
         if d.empty:
             return None
